@@ -9,14 +9,24 @@ $message = "";
 $categories = mysqli_query($conn, "SELECT * FROM categories ORDER BY name ASC");
 $suppliers = mysqli_query($conn, "SELECT * FROM suppliers ORDER BY name ASC");
 
+if (!$categories) {
+    die("Categories query failed: " . mysqli_error($conn));
+}
+
+if (!$suppliers) {
+    die("Suppliers query failed: " . mysqli_error($conn));
+}
+
 if ($_SERVER['REQUEST_METHOD'] == "POST") {
 
-    $category_id = $_POST['category_id'];
-    $supplier_id = $_POST['supplier_id'];
+    $category_id = intval($_POST['category_id']);
+    $supplier_id = intval($_POST['supplier_id']);
     $name = mysqli_real_escape_string($conn, $_POST['name']);
     $unit = mysqli_real_escape_string($conn, $_POST['unit']);
-    $unit_price = $_POST['unit_price'];
-    $low_stock_limit = $_POST['low_stock_limit'];
+    $quantity = intval($_POST['quantity']);
+    $unit_price = floatval($_POST['unit_price']);
+    $low_stock_limit = intval($_POST['low_stock_limit']);
+    $user_id = $_SESSION['user_id'] ?? null;
 
     $insert = mysqli_query($conn, "
         INSERT INTO products (
@@ -24,6 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] == "POST") {
             supplier_id,
             name,
             unit,
+            quantity,
             unit_price,
             low_stock_limit
         ) VALUES (
@@ -31,15 +42,34 @@ if ($_SERVER['REQUEST_METHOD'] == "POST") {
             '$supplier_id',
             '$name',
             '$unit',
+            '$quantity',
             '$unit_price',
             '$low_stock_limit'
         )
     ");
 
     if ($insert) {
+
+        if (!empty($user_id)) {
+            $details = mysqli_real_escape_string(
+                $conn,
+                "Added new product: $name with opening quantity $quantity"
+            );
+
+            mysqli_query($conn, "
+                INSERT INTO activity_logs (user_id, action, details)
+                VALUES (
+                    '$user_id',
+                    'Added Product',
+                    '$details'
+                )
+            ");
+        }
+
         $message = "Product added successfully.";
+
     } else {
-        $message = "Error adding product.";
+        $message = "Error adding product: " . mysqli_error($conn);
     }
 }
 ?>
@@ -69,18 +99,20 @@ if ($_SERVER['REQUEST_METHOD'] == "POST") {
 
             <select name="category_id" class="w-full border p-3 rounded-xl" required>
                 <option value="">Select Category</option>
+
                 <?php while ($cat = mysqli_fetch_assoc($categories)): ?>
                     <option value="<?php echo $cat['id']; ?>">
-                        <?php echo $cat['name']; ?>
+                        <?php echo htmlspecialchars($cat['name']); ?>
                     </option>
                 <?php endwhile; ?>
             </select>
 
             <select name="supplier_id" class="w-full border p-3 rounded-xl" required>
                 <option value="">Select Supplier</option>
+
                 <?php while ($sup = mysqli_fetch_assoc($suppliers)): ?>
                     <option value="<?php echo $sup['id']; ?>">
-                        <?php echo $sup['name']; ?>
+                        <?php echo htmlspecialchars($sup['name']); ?>
                     </option>
                 <?php endwhile; ?>
             </select>
@@ -88,6 +120,14 @@ if ($_SERVER['REQUEST_METHOD'] == "POST") {
             <input
                 name="unit"
                 placeholder="Unit e.g. bottle, carton, bag, pcs"
+                class="w-full border p-3 rounded-xl"
+                required
+            >
+
+            <input
+                type="number"
+                name="quantity"
+                placeholder="Opening Quantity"
                 class="w-full border p-3 rounded-xl"
                 required
             >

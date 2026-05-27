@@ -12,11 +12,16 @@ $products = mysqli_query($conn, "
     ORDER BY name ASC
 ");
 
+if (!$products) {
+    die("Products query failed: " . mysqli_error($conn));
+}
+
 if ($_SERVER['REQUEST_METHOD'] == "POST") {
 
-    $product_id = $_POST['product_id'];
+    $product_id = intval($_POST['product_id']);
     $quantity = intval($_POST['quantity']);
     $note = mysqli_real_escape_string($conn, $_POST['note']);
+    $user_id = $_SESSION['user_id'] ?? null;
 
     $product_query = mysqli_query($conn, "
         SELECT * FROM products
@@ -24,29 +29,49 @@ if ($_SERVER['REQUEST_METHOD'] == "POST") {
         LIMIT 1
     ");
 
+    if (!$product_query) {
+        die("Product lookup failed: " . mysqli_error($conn));
+    }
+
     $product = mysqli_fetch_assoc($product_query);
 
     if ($product && $quantity > 0) {
 
-        $previous_quantity = $product['quantity'];
+        $previous_quantity = intval($product['quantity']);
         $new_quantity = $previous_quantity + $quantity;
 
-        mysqli_query($conn, "
+        $update = mysqli_query($conn, "
             UPDATE products
             SET quantity='$new_quantity'
             WHERE id='$product_id'
         ");
 
-        mysqli_query($conn, "
-            INSERT INTO activity_logs (user_id, action, details)
-            VALUES (
-                '{$_SESSION['user_id']}',
-                'Stock In',
-                'Added $quantity to {$product['name']}. Previous: $previous_quantity, New: $new_quantity. $note'
-            )
-        ");
+        if ($update) {
 
-        $message = "Stock added successfully.";
+            if (!empty($user_id)) {
+                $product_name = $product['name'];
+
+                $details = mysqli_real_escape_string(
+                    $conn,
+                    "Added $quantity to $product_name. Previous: $previous_quantity, New: $new_quantity. $note"
+                );
+
+                mysqli_query($conn, "
+                    INSERT INTO activity_logs (user_id, action, details)
+                    VALUES (
+                        '$user_id',
+                        'Stock In',
+                        '$details'
+                    )
+                ");
+            }
+
+            $message = "Stock added successfully.";
+
+        } else {
+            $message = "Error updating stock: " . mysqli_error($conn);
+        }
+
     } else {
         $message = "Invalid product or quantity.";
     }
@@ -74,7 +99,8 @@ if ($_SERVER['REQUEST_METHOD'] == "POST") {
 
                 <?php while ($row = mysqli_fetch_assoc($products)): ?>
                     <option value="<?php echo $row['id']; ?>">
-                        <?php echo $row['name']; ?> — Current Qty: <?php echo $row['quantity']; ?>
+                        <?php echo htmlspecialchars($row['name']); ?>
+                        — Current Qty: <?php echo (int)$row['quantity']; ?>
                     </option>
                 <?php endwhile; ?>
             </select>
