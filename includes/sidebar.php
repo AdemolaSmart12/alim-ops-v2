@@ -62,6 +62,9 @@ $department_name = $_SESSION['department_name'] ?? 'No Department';
             <a class="sidebar-link" href="../departments/use_stock.php">
                 Use Stock
             </a>
+            <a class="sidebar-link" href="../departments/sales.php">
+                Department Sales
+            </a>
             
 
         <?php endif; ?>
@@ -80,6 +83,10 @@ $department_name = $_SESSION['department_name'] ?? 'No Department';
             <a class="sidebar-link" href="../expenses/reports.php">
                 Expense Reports
             </a>
+            <a class="sidebar-link" href="../reports/usage_history.php">
+              Usage History
+            </a>
+            
 
         <?php endif; ?>
 
